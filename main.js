@@ -1,12 +1,13 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const {program} = require('commander');
+const { program } = require('commander');
 const multer = require('multer');
 const bodyParser = require("body-parser");
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 
 const mlt = multer();
-
 
 program
   .requiredOption('-h, --host <host>', 'server host')
@@ -19,8 +20,49 @@ const lab5 = express();
 lab5.use(express.json());
 lab5.use(bodyParser.raw({ type: "text/plain" }));
 
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Notes API',
+      version: '1.0.0',
+      description: 'API for managing notes'
+    },
+    servers: [
+      {
+        url: `http://${options.host}:${options.port}`
+      }
+    ]
+  },
+  apis: [__filename], // Documenting APIs in this file
+};
 
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+lab5.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
+/**
+ * @swagger
+ * /notes/{note_name}:
+ *   get:
+ *     summary: Get a note by name
+ *     parameters:
+ *       - in: path
+ *         name: note_name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Name of the note
+ *     responses:
+ *       200:
+ *         description: Note content
+ *         content:
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *       404:
+ *         description: Note not found
+ */
 lab5.get('/notes/:note_name', (req, res) => {
   const path_to_note = path.join(options.cache, `${req.params.note_name}.txt`);
   fs.readFile(path_to_note, null, (err, data) => {
@@ -31,6 +73,31 @@ lab5.get('/notes/:note_name', (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /notes/{note_name}:
+ *   put:
+ *     summary: Update a note
+ *     parameters:
+ *       - in: path
+ *         name: note_name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Name of the note to update
+ *     requestBody:
+ *       description: Note content to update
+ *       required: true
+ *       content:
+ *         text/plain:
+ *           schema:
+ *             type: string
+ *     responses:
+ *       200:
+ *         description: Note updated
+ *       404:
+ *         description: Note not found
+ */
 lab5.put('/notes/:note_name', (req, res) => {
   const noteName = req.params.note_name.trim(); 
   const path_to_note = path.join(options.cache, `${noteName}.txt`);
@@ -49,6 +116,24 @@ lab5.put('/notes/:note_name', (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /notes/{note_name}:
+ *   delete:
+ *     summary: Delete a note
+ *     parameters:
+ *       - in: path
+ *         name: note_name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Name of the note to delete
+ *     responses:
+ *       200:
+ *         description: Note deleted
+ *       404:
+ *         description: Note not found
+ */
 lab5.delete('/notes/:note_name', (req, res) => {
     const path_to_note = path.join(options.cache, `${req.params.note_name}.txt`);
     fs.unlink(path_to_note, (err) => {
@@ -59,6 +144,26 @@ lab5.delete('/notes/:note_name', (req, res) => {
     });
 });
 
+/**
+ * @swagger
+ * /notes:
+ *   get:
+ *     summary: Get a list of all notes
+ *     responses:
+ *       200:
+ *         description: List of notes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                   text:
+ *                     type: string
+ */
 lab5.get('/notes', (req, res) => {
     fs.readdir(options.cache, (err, files) => {
       if (err) throw err;
@@ -70,6 +175,28 @@ lab5.get('/notes', (req, res) => {
     });
 });
 
+/**
+ * @swagger
+ * /write:
+ *   post:
+ *     summary: Create a new note
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               note_name:
+ *                 type: string
+ *               note:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Note created
+ *       400:
+ *         description: Bad request
+ */
 lab5.post('/write', mlt.none(), (req, res) => {
     const path_to_note = path.join(options.cache, `${req.body.note_name}.txt`);
     fs.access(path_to_note, fs.constants.F_OK, (err) => {
@@ -82,11 +209,6 @@ lab5.post('/write', mlt.none(), (req, res) => {
       });
     });
 });
-
-lab5.get('/UploadForm.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'UploadForm.html'));
-});
-
 
 lab5.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}`);
